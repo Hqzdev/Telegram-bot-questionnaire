@@ -2648,3 +2648,6 @@ aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: messa
 2025-08-28 19:35:37,388 - __main__ - INFO - Конфигурация проверена успешно
 2025-08-28 19:35:37,388 - aiogram.dispatcher - INFO - Start polling
 2025-08-28 19:35:37,842 - aiogram.dispatcher - INFO - Run polling for bot @Deadline_Guard_bot id=8425630232 - 'Deadline_Guard_bot'
+2025-08-28 19:38:07,258 - aiogram.event - INFO - Update id=698382577 is handled. Duration 600 ms by bot id=8425630232
+2025-08-28 19:38:09,659 - aiogram.event - INFO - Update id=698382578 is handled. Duration 102 ms by bot id=8425630232
+2025-08-28 19:38:11,109 - aiogram.event - INFO - Update id=698382579 is handled. Duration 100 ms by bot id=8425630232

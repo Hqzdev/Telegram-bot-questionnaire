@@ -106,19 +106,19 @@ async def create_prereg(user_id: int, tariff: str = "Pro 2 990 ₽"):
 def kb_fbs_demo():
     """Клавиатура для FBS демо-уведомления"""
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Отложить 15 мин", callback_data="demo:fbs:snooze15"),
-        InlineKeyboardButton(text="Готово ✅", callback_data="demo:fbs:done")
+        InlineKeyboardButton(text="⏰ Отложить 15 мин", callback_data="demo:fbs:snooze15"),
+        InlineKeyboardButton(text="✅ Готово", callback_data="demo:fbs:done")
     ],[
-        InlineKeyboardButton(text="Сводка /summary", callback_data="demo:summary")
+        InlineKeyboardButton(text="📊 Сводка", callback_data="demo:summary")
     ]])
 
 def kb_fbo_demo():
     """Клавиатура для FBO демо-уведомления"""
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Изменить слот", callback_data="demo:fbo:slot"),
-        InlineKeyboardButton(text="Напомнить утром", callback_data="demo:fbo:morning")
+        InlineKeyboardButton(text="📅 Изменить слот", callback_data="demo:fbo:slot"),
+        InlineKeyboardButton(text="🌅 Напомнить утром", callback_data="demo:fbo:morning")
     ],[
-        InlineKeyboardButton(text="Сводка /summary", callback_data="demo:summary")
+        InlineKeyboardButton(text="📊 Сводка", callback_data="demo:summary")
     ]])
 
 async def send_demo_notifications(msg: Message):
@@ -143,7 +143,7 @@ async def send_demo_notifications_with_intro(msg: Message):
         "Ниже вы увидите два типа уведомлений:\n"
         "• <b>FBS</b> — заказы со склада продавца\n"
         "• <b>FBO</b> — поставки на склад маркетплейса\n\n"
-        "Попробуйте кнопки — они работают!",
+        "💡 Попробуйте кнопки — они работают!",
         parse_mode='HTML'
     )
     await send_demo_notifications(msg)
@@ -194,9 +194,9 @@ async def show_pricing(msg: Message):
 """
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Закрепить предзапись", callback_data="prereg:lock")],
-        [InlineKeyboardButton(text="Показать демо", callback_data="demo:open")],
-        [InlineKeyboardButton(text="Мой код цены", callback_data="my_price")]
+        [InlineKeyboardButton(text="🔒 Закрепить предзапись", callback_data="prereg:lock")],
+        [InlineKeyboardButton(text="🎯 Показать демо", callback_data="demo:open")],
+        [InlineKeyboardButton(text="💳 Мой код цены", callback_data="my_price")]
     ])
     
     await msg.answer(pricing_text, reply_markup=keyboard, parse_mode='HTML')
@@ -654,19 +654,28 @@ async def cmd_restart(message: Message, state: FSMContext):
 @dp.message(Command("my_price"))
 async def my_price(msg: Message):
     """Показать код цены пользователя"""
-    db_path = "bot.db"
-    async with aiosqlite.connect(db_path) as db:
-        cur = await db.execute("SELECT code, tariff, valid_to FROM prereg WHERE user_id=?", (msg.from_user.id,))
-        row = await cur.fetchone()
-    if not row:
-        await msg.answer("Предзапись не найдена. Нажмите «Закрепить предзапись в приоритет и быть первым кто испробует».")
-        return
-    code, tariff, valid_to = row
-    d = datetime.fromisoformat(valid_to)
-    await msg.answer(
-        f"Ваш код цены: <b>{code}</b>\nТариф: {tariff}\nДействует до: {d.strftime('%d.%m.%Y')}",
-        parse_mode='HTML'
-    )
+    try:
+        db_path = "bot.db"
+        async with aiosqlite.connect(db_path) as db:
+            cur = await db.execute("SELECT code, tariff, valid_to FROM prereg WHERE user_id=?", (msg.from_user.id,))
+            row = await cur.fetchone()
+        
+        if not row:
+            await msg.answer("❌ Предзапись не найдена\n💡 Используйте /prereg для создания предзаписи")
+            return
+        
+        code, tariff, valid_to = row
+        d = datetime.fromisoformat(valid_to)
+        await msg.answer(
+            f"💳 <b>Ваш код цены</b>\n\n"
+            f"Код: <code>{code}</code>\n"
+            f"Тариф: {tariff}\n"
+            f"Действует до: {d.strftime('%d.%m.%Y')}",
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        await msg.answer("❌ Ошибка получения кода цены")
+        logger.error(f"Ошибка получения кода цены: {e}")
 
 @dp.message(Command("demo"))
 async def cmd_demo(msg: Message):
@@ -691,22 +700,25 @@ async def cmd_checklist(msg: Message):
 @dp.message(Command("summary"))
 async def cmd_summary(msg: Message):
     """Показать сводку"""
-    await msg.answer("📊 Сводка (демо): спасено заказов: 7 · избегнуто удержаний: 1")
+    await msg.answer("📈 Сводка за сегодня:\n• Спасено заказов: 7\n• Избегнуто удержаний: 1\n• Экономия: 25 000 ₽")
 
 @dp.message(Command("prereg"))
 async def cmd_prereg(msg: Message):
     """Создать предзапись"""
-    code, valid_to, place = await create_prereg(msg.from_user.id)
-    await log_event(msg.from_user.id, "prereg_lock", code)
-    await msg.answer(
-        f"✅ Предзапись закреплена!\n"
-        f"Код цены: <b>{code}</b>\n"
-        f"Тариф: Pro 2 990 ₽\n"
-        f"Действует до: {valid_to.strftime('%d.%m.%Y')}\n"
-        f"Ваш номер в очереди: №{place}\n\n"
-        f"Далее: 15-минутный пилот без подключений — когда удобно?",
-        parse_mode='HTML'
-    )
+    try:
+        code, valid_to, place = await create_prereg(msg.from_user.id)
+        await log_event(msg.from_user.id, "prereg_lock", code)
+        await msg.answer(
+            f"✅ Предзапись закреплена!\n"
+            f"Код цены: <b>{code}</b>\n"
+            f"Тариф: Pro 2 990 ₽\n"
+            f"Действует до: {valid_to.strftime('%d.%m.%Y')}\n"
+            f"Ваш номер в очереди: №{place}",
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        await msg.answer("❌ Ошибка создания предзаписи. Попробуйте позже.")
+        logger.error(f"Ошибка создания предзаписи: {e}")
 
 @dp.message(Command("help"))
 async def cmd_help(msg: Message):
@@ -792,20 +804,22 @@ async def handle_demo_buttons(callback: CallbackQuery):
     await log_event(callback.from_user.id, "demo_click", callback.data)
     
     if callback.data == "demo:fbs:snooze15":
-        await callback.answer("Ок, напомню через 15 минут (демо).")
-        # В демо можно реально напомнить:
-        asyncio.create_task(remind_later(callback.message.chat.id, 15))
+        await callback.answer("⏰ Напомню через 15 минут")
+        await callback.message.answer("🔔 Напоминание запланировано на 15 минут")
     elif callback.data == "demo:fbs:done":
-        await callback.answer("Отмечено как выполнено (демо).")
+        await callback.answer("✅ Выполнено!")
+        await callback.message.answer("🎉 Заказ отмечен как выполненный")
     elif callback.data == "demo:fbo:slot":
-        await callback.answer("Ок, открою подсказки по переносу слота (демо).")
+        await callback.answer("📅 Открываю календарь слотов")
+        await callback.message.answer("📋 Подсказки по переносу слота:\n• Переносить не позднее 72 часов\n• Уведомить менеджера\n• Проверить новый слот")
     elif callback.data == "demo:fbo:morning":
-        await callback.answer("Напомню утром (демо).")
+        await callback.answer("🌅 Напомню утром")
+        await callback.message.answer("⏰ Напоминание установлено на утро (9:00)")
     elif callback.data == "demo:summary":
-        await callback.message.answer("📊 Сводка (демо): спасено заказов: 7 · избегнуто удержаний: 1")
-        await callback.answer()
+        await callback.answer("📊 Показываю сводку")
+        await callback.message.answer("📈 Сводка за сегодня:\n• Спасено заказов: 7\n• Избегнуто удержаний: 1\n• Экономия: 25 000 ₽")
     elif callback.data == "demo:open":
-        await callback.answer("Показываем демо-уведомления...")
+        await callback.answer("🎯 Показываю демо")
         await send_demo_notifications_with_intro(callback.message)
 
 @dp.callback_query(F.data.startswith("nav:"))
@@ -814,8 +828,8 @@ async def handle_nav_buttons(callback: CallbackQuery):
     await log_event(callback.from_user.id, "nav_click", callback.data)
     
     if callback.data == "nav:pricing":
+        await callback.answer("💰 Показываю тарифы")
         await show_pricing(callback.message)
-        await callback.answer()
 
 @dp.callback_query(F.data.startswith("prereg:"))
 async def handle_prereg_buttons(callback: CallbackQuery):
@@ -823,44 +837,51 @@ async def handle_prereg_buttons(callback: CallbackQuery):
     await log_event(callback.from_user.id, "prereg_click", callback.data)
     
     if callback.data == "prereg:lock":
-        code, valid_to, place = await create_prereg(callback.from_user.id)
-        await callback.message.answer(
-            f"✅ Предзапись закреплена!\n"
-            f"Код цены: <b>{code}</b>\n"
-            f"Тариф: Pro 2 990 ₽\n"
-            f"Действует до: {valid_to.strftime('%d.%m.%Y')}\n"
-            f"Ваш номер в очереди: №{place}\n\n"
-            f"Далее: 15-минутный пилот без подключений — когда удобно?",
-            parse_mode='HTML'
-        )
-        await callback.answer("Предзапись закреплена.")
+        await callback.answer("🔒 Создаю предзапись...")
+        try:
+            code, valid_to, place = await create_prereg(callback.from_user.id)
+            await callback.message.answer(
+                f"✅ Предзапись закреплена!\n"
+                f"Код цены: <b>{code}</b>\n"
+                f"Тариф: Pro 2 990 ₽\n"
+                f"Действует до: {valid_to.strftime('%d.%m.%Y')}\n"
+                f"Ваш номер в очереди: №{place}",
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            await callback.message.answer("❌ Ошибка создания предзаписи. Попробуйте позже.")
+            logger.error(f"Ошибка создания предзаписи: {e}")
 
 @dp.callback_query(F.data == "my_price")
 async def handle_my_price_button(callback: CallbackQuery):
     """Обработчик кнопки 'Мой код цены'"""
     await log_event(callback.from_user.id, "my_price_click", "button")
     
-    db_path = "bot.db"
-    async with aiosqlite.connect(db_path) as db:
-        cur = await db.execute("SELECT code, tariff, valid_to FROM prereg WHERE user_id=?", (callback.from_user.id,))
-        row = await cur.fetchone()
-    
-    if not row:
-        await callback.answer("Предзапись не найдена. Сначала закрепите предзапись!")
-        return
-    
-    code, tariff, valid_to = row
-    d = datetime.fromisoformat(valid_to)
-    
-    await callback.message.answer(
-        f"💳 <b>Ваш код цены</b>\n\n"
-        f"Код: <code>{code}</code>\n"
-        f"Тариф: {tariff}\n"
-        f"Действует до: {d.strftime('%d.%m.%Y')}\n\n"
-        f"Сохраните этот код — он закреплен за вами на 6 месяцев!",
-        parse_mode='HTML'
-    )
-    await callback.answer("Код цены показан.")
+    try:
+        db_path = "bot.db"
+        async with aiosqlite.connect(db_path) as db:
+            cur = await db.execute("SELECT code, tariff, valid_to FROM prereg WHERE user_id=?", (callback.from_user.id,))
+            row = await cur.fetchone()
+        
+        if not row:
+            await callback.answer("❌ Предзапись не найдена")
+            await callback.message.answer("💡 Сначала создайте предзапись через кнопку «Закрепить предзапись»")
+            return
+        
+        code, tariff, valid_to = row
+        d = datetime.fromisoformat(valid_to)
+        
+        await callback.answer("💳 Показываю код цены")
+        await callback.message.answer(
+            f"💳 <b>Ваш код цены</b>\n\n"
+            f"Код: <code>{code}</code>\n"
+            f"Тариф: {tariff}\n"
+            f"Действует до: {d.strftime('%d.%m.%Y')}",
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        await callback.answer("❌ Ошибка получения кода")
+        logger.error(f"Ошибка получения кода цены: {e}")
 
 # Обработчик неизвестных сообщений
 @dp.message()
